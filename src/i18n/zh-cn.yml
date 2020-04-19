@@ -1,0 +1,35 @@
+video:
+  Loop: 循环
+  Speed: 速度
+  Normal: 正常
+  load_fail: 视频加载失败
+  switching_to: 正在切换至
+  switched_to: 已经切换至
+  quality: 画质
+  FF: 快进
+  REW: 快退
+  Setting: 设置
+  Full_screen: 全屏
+  s: 秒
+  Show_subtitle: 显示字幕
+  Hide_subtitle: 隐藏字幕
+  Volume: 音量
+  Live: 直播
+  Video_info: 视频统计信息
+  prev_frame: 上一帧
+  next_frame: 下一帧
+  detection: AI 侦测
+  in_screen: 画中画
+  speed: 播放速度
+  autoHideControl: 自动隐藏控制栏
+  snapshot: 截图
+  openUrl: 打开流媒体
+  openDir: 打开播放目录
+  playControl: 播放控制
+  settings:
+    snapshot_format: 截图保存格式
+    auto_next: 自动播放下一个
+  play_list:
+    remove: 移除
+    removeAll: 清空
+    add: 添加

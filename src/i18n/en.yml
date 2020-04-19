@@ -1,0 +1,35 @@
+video:
+  Loop: Loop
+  Speed: Speed
+  Normal: Normal
+  load_fail: Load fail
+  switching_to: Switching_to
+  switched_to: Switched to
+  quality: Quality
+  FF: FF
+  REW: REW
+  Setting: Setting
+  Full_screen: Full screen
+  s: s
+  Show_subtitle: Show subtitle
+  Hide_subtitle: Hide subtitle
+  Volume: Volume
+  Live: Live
+  Video_info: Video info
+  prev_frame: Previous Frame
+  next_frame: Next Frame
+  detection: AI Detection
+  in_screen: In Picture
+  speed: Speed
+  autoHideControl: Auto hide controller
+  snapshot: Snapshot
+  openUrl: Open URL
+  openDir: Open Directory
+  playControl: Play Control
+  settings:
+    snapshot_format: Snapshot saving format
+    auto_next: Auto play next
+  play_list:
+    remove: Remove
+    removeAll: Remove All
+    add: Add
