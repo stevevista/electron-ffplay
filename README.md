@@ -1,10 +1,12 @@
 # Simple video player using electron & ffplay (as node addon)
 
+![avatar](./ffplay.png)
+
 # build
 ```bash
 # build ffmpeg according to https://github.com/ShiftMediaProject
 # build using x64/Release mode
-# support all sources are at D:\some_dir\src
+# suppose all sources are at D:\some_dir\src\{FFmpeg,...}
 
 # get electron-ffplay source
 cd electron-ffplay
