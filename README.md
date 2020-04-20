@@ -15,7 +15,7 @@ cd electron-ffplay
 cd node-ffplay
 mkdir build
 cd build
-cmake -G "Visual Studio 15" -A x64 .. -DFFMPEG_SRC_DIR=D:\some_dir\src
+cmake -G "Visual Studio 15" -A x64 .. -DFFMPEG_SRC_DIR=D:\some_dir\src\FFmpeg
 cmake --build . --config Release
 cd ../..
 
