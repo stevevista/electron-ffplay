@@ -22,3 +22,4 @@ node-scheduler
 *.dll
 sign.cer
 node_cache
+.third-party

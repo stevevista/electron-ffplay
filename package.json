@@ -1,6 +1,6 @@
 {
   "name": "electron-ffplay",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "R.J.",
   "description": "An electron-vue project",
   "license": "MIT",
@@ -15,6 +15,8 @@
     "e2e": "npm run pack && mocha test/e2e",
     "lint": "eslint --ext .js,.vue -f ./node_modules/eslint-friendly-formatter src test",
     "lint:fix": "eslint --ext .js,.vue -f ./node_modules/eslint-friendly-formatter --fix src test",
+    "configure:ffplay": "node cmake-tool configure -d node-ffplay --CDTHIRD_PARTY_DIR=../.third-party",
+    "build:ffplay": "node cmake-tool build -d node-ffplay",
     "test": "npm run unit && npm run e2e",
     "unit": "karma start test/unit/karma.conf.js"
   },
@@ -29,7 +31,8 @@
       "dist/electron/**/*"
     ],
     "extraFiles": [
-      "licenses/**/*"
+      "licenses/**/*",
+      "*.dll"
     ],
     "dmg": {
       "contents": [
@@ -57,9 +60,6 @@
       "icon": "resources/icons"
     }
   },
-  "dependencies": {
-    "node-ffplay": "file:./node-ffplay"
-  },
   "devDependencies": {
     "@babel/core": "^7.5.5",
     "@babel/plugin-proposal-class-properties": "^7.5.5",
@@ -76,6 +76,7 @@
     "babili-webpack-plugin": "^0.1.2",
     "balloon-css": "^1.0.4",
     "big-integer": "^1.6.48",
+    "bluebird": "^3.7.2",
     "brace": "^0.11.1",
     "chai": "^4.1.2",
     "chalk": "^2.4.1",
@@ -98,6 +99,7 @@
     "eslint-plugin-promise": "^3.8.0",
     "eslint-plugin-standard": "^3.1.0",
     "file-loader": "^1.1.11",
+    "fs-extra": "^9.1.0",
     "html-webpack-plugin": "^3.2.0",
     "inject-loader": "^4.0.1",
     "karma": "^2.0.2",
@@ -108,17 +110,21 @@
     "karma-sourcemap-loader": "^0.3.7",
     "karma-spec-reporter": "^0.0.32",
     "karma-webpack": "^3.0.0",
+    "lodash": "^4.17.20",
     "mini-css-extract-plugin": "0.4.0",
     "mocha": "^5.2.0",
     "moment": "^2.24.0",
     "multispinner": "^0.2.1",
     "node-loader": "^0.6.0",
     "node-sass": "^4.9.2",
+    "npmlog": "^4.1.2",
     "raw-loader": "^4.0.0",
+    "rc": "^1.2.8",
     "require-dir": "^1.0.0",
     "sass-loader": "^7.0.3",
     "selectn": "^1.1.2",
     "spectron": "^3.8.0",
+    "splitargs": "0.0.7",
     "style-loader": "^0.21.0",
     "url-loader": "^1.0.1",
     "vue": "^2.6.10",
@@ -135,6 +141,7 @@
     "webpack-dev-server": "^3.1.4",
     "webpack-hot-middleware": "^2.22.2",
     "webpack-merge": "^4.1.3",
+    "which": "^2.0.2",
     "xml2js": "^0.4.22",
     "yml-loader": "^2.1.0"
   }

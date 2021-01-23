@@ -3,15 +3,12 @@
 #undef main
 
 extern "C" {
-#include "config.h"
 #include "libavutil/opt.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
-#if CONFIG_AVFILTER
 # include "libavfilter/avfilter.h"
 # include "libavfilter/buffersink.h"
 # include "libavfilter/buffersrc.h"
-#endif
 }
 
 #include <memory>

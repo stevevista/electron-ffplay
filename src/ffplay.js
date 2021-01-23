@@ -1,28 +1,6 @@
-const validABIs = [
-  64, 67, 72, 79
-]
+import {requireAddon} from './import-dll'
 
-let abi = +process.versions.modules;
-let selAbi = 0
-for (let i = 0; i < validABIs.length; i++) {
-  if (validABIs[i] == abi) {
-    selAbi = validABIs[i];
-    break;
-  } else if (validABIs[i] > abi) {
-    if ( i > 0) {
-      selAbi = validABIs[i - 1];
-    }
-    break;
-  }
-}
-
-const suffix = process.platform + '-' + process.arch
-
-if (selAbi === 0) {
-  throw Error(`no valid abi native match for node-${suffix}: ${process.versions.node}`)
-}
-
-const binding = require(`./build/lib/Release/ff_binding-${suffix}.abi-${selAbi}`);
+const binding = requireAddon('node-ffplay');
 const {EventEmitter} = require('events');
 const {inherits} = require('util');
 const {PlayBack, Decoder} = binding
@@ -69,7 +47,7 @@ PlayBack.prototype.speed = function (v) {
   this.send('speed', 0, v)
 }
 
-module.exports = {
+export {
   PlayBack,
   Decoder
 }

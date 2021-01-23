@@ -13,17 +13,15 @@ extern "C" {
    Studio) will not omit unused inline functions and create undefined
    references to libraries that are not being built. */
 extern "C" {
-#include "config.h"
 #include "libavutil/log.h"
 #include "libavutil/avstring.h"
 #include "libavutil/eval.h"
 #include "libavutil/pixdesc.h"
 #include "libavutil/parseutils.h"
 #include "libavutil/imgutils.h"
-#include "libavformat/network.h"
+#include "libavutil/time.h"
 #include "libavfilter/avfilter.h"
 #include "libswscale/swscale.h"
-#include "libavresample/avresample.h"
 #include "libswresample/swresample.h"
 }
 

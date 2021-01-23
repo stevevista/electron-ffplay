@@ -1,5 +1,5 @@
 /* eslint-disable*/
-import {Decoder} from 'node-ffplay'
+import {Decoder} from '../../ffplay'
 import {EventEmitter} from 'events';
 import fs from 'fs'
 
