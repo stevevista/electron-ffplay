@@ -16,7 +16,7 @@
 - https://github.com/ShiftMediaProject/SDL/releases/download/release-2.0.14/libsdl_release-2.0.14_msvc15.zip
 - https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2021-01-14-13-18/ffmpeg-n4.3.1-29-g89daac5fe2-win64-lgpl-shared-4.3.zip
 
-uncompress libsdl2*.zip & ffmpeg*.zip to electron-ffplay/.third_party/prebuilt
+uncompress libsdl2*.zip & ffmpeg*.zip to electron-ffplay/.third-party/prebuilt
 
 put .third_party/prebuilt/bin[/x64]/*.dll in electron-ffplay/
 
