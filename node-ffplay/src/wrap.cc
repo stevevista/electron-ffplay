@@ -13,6 +13,9 @@
 #error Please define _HAS_EXCEPTIONS=1, otherwise exception handling will not work properly
 #endif
 
+extern "C" {
+#include "libavutil/log.h"
+}
 
 static constexpr size_t MAX_CACHE_DETECTION_OBJECTS = 512;
 
@@ -102,8 +105,8 @@ Napi::Object DecoderObject::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "Decoder", {
-    InstanceMethod("decode", &Decode),
-    InstanceMethod("close", &Close),
+    InstanceMethod("decode", &DecoderObject::Decode),
+    InstanceMethod("close", &DecoderObject::Close),
   });
 
   constructor = Napi::Persistent(func);
@@ -388,7 +391,7 @@ Napi::Object PlayBackObject::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "PlayBack", {
-    InstanceMethod("send", &Send)
+    InstanceMethod("send", &PlayBackObject::Send)
   });
 
   constructor = Napi::Persistent(func);
@@ -618,7 +621,6 @@ void PlayBackObject::iyuv_callback(ThreadSafeCallback* safe_callback, AVFrame* f
   unique_lock<mutex> lock(mtx_);
 
   lock.unlock();
-
   const auto width = frame->width;
   const auto height = frame->height;
 

@@ -23,3 +23,7 @@ node-scheduler
 sign.cer
 node_cache
 .third-party
+FFmpegLog.txt
+electron-ffplay.code-workspace
+node-ffplay-darwin-x64.abi-72.dylib
+vendor

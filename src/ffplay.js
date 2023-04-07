@@ -8,6 +8,7 @@ const {PlayBack, Decoder} = binding
 inherits(PlayBack, EventEmitter)
 
 PlayBack.prototype.command = function (...args) {
+  console.log(args)
   this.send(...args)
 }
 

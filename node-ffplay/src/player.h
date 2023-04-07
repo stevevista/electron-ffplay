@@ -1,5 +1,5 @@
 #pragma once
-#include <SDL/SDL.h>
+#include <SDL2/SDL.h>
 #undef main
 
 extern "C" {
@@ -9,6 +9,7 @@ extern "C" {
 # include "libavfilter/avfilter.h"
 # include "libavfilter/buffersink.h"
 # include "libavfilter/buffersrc.h"
+# include "libavutil/cpu.h"
 }
 
 #include <memory>

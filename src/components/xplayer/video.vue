@@ -15,6 +15,7 @@ import YUVCanvas from './yuv-canvas'
 import {DetectionCanvas} from './detection-canvas'
 import {DecodeSync} from './test_decode'
 import path from 'path'
+import sdl from '@kmamal/sdl'
 
 let inDNNProcessing = false
 
@@ -22,7 +23,16 @@ const rtpsPatern = /^rtsp:\/\/(.*)/
 const audioPattern = /Audio\: (.*)/;
 const videoPattern = /Video\: (.*)/;
 
+
+const width = 640
+const height = 480
+
+
 function PlayOverFFmpeg (core, url, transport) {
+
+  const arg = {title:"郑永",width,height}
+  //let window = sdl.video.createWindow(arg);
+        //SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
   const rtspMath = url.match(rtpsPatern)
 
   const vargs = []
@@ -44,7 +54,13 @@ function PlayOverFFmpeg (core, url, transport) {
   if (process.env.NODE_ENV === 'development' && path.basename(url) === 'foreman_352x288_30fps.h264') {
     ff = DecodeSync(vargs)
   } else {
-    ff = new PlayBack(...vargs)
+    console.log('create ff instanc *********',vargs)
+    try {
+      ff = new PlayBack(...vargs)
+    } catch(err) {
+      console.log('failedt to create ff instanc *********',err)
+    }
+     
   }
 
   let _authRequire = false
@@ -68,12 +84,14 @@ function PlayOverFFmpeg (core, url, transport) {
   });
 
   ff.on('yuv', frame => {
+    //console.log("receive frame yuv")
     frame.cropLeft = 0;
     frame.cropTop = 0;
     frame.cropWidth = frame.width;
     frame.cropHeight = frame.height;
 
     core._renderFrame(frame);
+    //console.log("receive frame yuv end",frame)
   })
 
   ff.on('meta', ({duration, width, height, info}) => {
@@ -236,7 +254,6 @@ export default {
     },
 
     _renderFrame (frame) {
-      // console.log(frame)
       if (this.inscreenCanvas) {
         this.inscreenCanvas.drawFrame(frame);
       } else {

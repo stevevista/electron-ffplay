@@ -27,10 +27,24 @@ extern "C" {
 
 #include <chrono>
 using namespace std::chrono_literals;
+FILE *fp = NULL;
+
+
+void log_callback_impl(void* ptr,int level,const char* fmt, va_list vl){
+  if (fp == NULL){
+      fp = fopen("FFmpegLog.txt", "a+");
+  }
+  if (fp) {
+			vfprintf(fp, fmt, vl);
+			fflush(fp);
+  }
+}
+
 
 void ff_init() {
-  av_log_set_flags(AV_LOG_SKIP_REPEATED);
-  // av_log_set_callback(log_callback_null);
+  //av_log_set_flags(AV_LOG_SKIP_REPEATED);
+  av_log_set_callback(log_callback_impl);
+  av_log_set_level(AV_LOG_VERBOSE);
   avformat_network_init();
 
   /* Try to work around an occasional ALSA buffer underflow issue when the
@@ -69,6 +83,10 @@ typedef struct OptionDef {
     const char *argname;
 } OptionDef;
 
+
+
+
+
 static int64_t parse_time_or_die(const char *context, const char *timestr,
                           int is_duration)
 {
@@ -79,6 +97,8 @@ static int64_t parse_time_or_die(const char *context, const char *timestr,
     }
     return us;
 }
+
+
 
 static double parse_number_or_die(const char *context, const char *numstr, int type,
                            double min, double max)
@@ -388,7 +408,7 @@ static int opt_volume(void *optctx, const char *opt, const char *arg)
 static int opt_format(void *optctx, const char *opt, const char *arg)
 {
   auto ctx = (PlayBackContext*)optctx;
-  ctx->iformat = av_find_input_format(arg);
+  ctx->iformat = const_cast<AVInputFormat*>(av_find_input_format(arg));
   if (!ctx->iformat) {
     throw runtime_error(string("Unknown input format: ") + arg);
   }
@@ -1094,6 +1114,7 @@ int Decoder::decodeFrame(PacketGetter packet_getter, AVFrame *frame, AVSubtitle 
       if (avctx_->codec_type == AVMEDIA_TYPE_SUBTITLE) {
         int got_frame = 0;
         ret = avcodec_decode_subtitle2(avctx_, sub, &got_frame, &pkt);
+        av_log(avctx_, AV_LOG_ERROR, "avcodec_decode_subtitle2 subtitle %d,%d %d %d.\n",ret,got_frame,sub->num_rects,sub->end_display_time);
         if (ret < 0) {
           ret = AVERROR(EAGAIN);
         } else {
@@ -1227,6 +1248,10 @@ int ConverterContext::convert(AVFrame *src_frame) {
 
 int ConverterContext::convert(int src_format, int src_width, int src_height, const uint8_t * const*pixels, int* pitch) {
 
+  if (src_format == AV_PIX_FMT_PAL8){
+  av_log(NULL, AV_LOG_ERROR, "yong subtitle convert_ctx start:.\n");
+  }
+
   int buffer_size = av_image_fill_arrays(frame_->data, frame_->linesize, buffer, target_fmt,
                         src_width, src_height, 1);
   if (buffer_size > buffer_size_) {
@@ -1243,15 +1268,21 @@ int ConverterContext::convert(int src_format, int src_width, int src_height, con
                         target_fmt, SWS_BICUBIC, NULL, NULL, NULL);
 
   if (convert_ctx) {
+    //av_log(NULL, AV_LOG_ERROR, "yong subtitle convert_ctx start:.\n");
     frame_->format = target_fmt;
     frame_->width = src_width;
     frame_->height = src_height;
     int r = sws_scale(convert_ctx, pixels, pitch,
                                         0, src_height, frame_->data, frame_->linesize);
+                                        if (src_format == AV_PIX_FMT_PAL8){
+  av_log(NULL, AV_LOG_ERROR, "yong subtitle convert_ctx sws %d:.\n",r);
+  }
+
     if (r <= 0) {
+      av_log(NULL, AV_LOG_ERROR, "yong subtitle convert_ctx failed:.\n");
             return -1;
     }
-    return 0;
+    return r;
   }
   return -1;
 }
@@ -1294,8 +1325,13 @@ void PlayBackContext::eventLoop(int argc, char **argv) {
     throw runtime_error("An input file must be specified.");
   }
 
-  streamOpen();
+  try {
+    streamOpen();
+  }catch(exception &e){
+    av_log(NULL, AV_LOG_ERROR, "yong streamopen error:%s.\n",e.what());
+  }
 
+  //streamOpen();
   MediaEvent event;
   int quit = 0;
 
@@ -1316,9 +1352,11 @@ void PlayBackContext::eventLoop(int argc, char **argv) {
 void PlayBackContext::refreshLoopWaitEvent(MediaEvent *event) {
   double remaining_time = 0.0;
   while (!evq_.get(event)) {
-    if (remaining_time > 0.0)
+    //av_log(NULL, AV_LOG_ERROR, "yong refreshLoopWaitEvent  start %f:.\n",remaining_time);
+    if (remaining_time > 0.0){
       av_usleep((int64_t)(remaining_time * 1000000.0));
-        
+    }
+       
     remaining_time = REFRESH_RATE;
     if (!this->paused || force_refresh_) {
       if (!this->paused && this->realtime_)
@@ -1326,7 +1364,6 @@ void PlayBackContext::refreshLoopWaitEvent(MediaEvent *event) {
 
       if (this->video_st) {
         video_refresh(&remaining_time);
-
         /* display picture */
         if (force_refresh_ && pictureQueue_.rindex_shown)
           video_image_display();
@@ -1336,6 +1373,7 @@ void PlayBackContext::refreshLoopWaitEvent(MediaEvent *event) {
 
       static int64_t last_time;
       videoRefreshShowStatus(last_time);
+
     }
   }
 }
@@ -1457,7 +1495,7 @@ static AVDictionary *filter_codec_opts(AVDictionary *opts, enum AVCodecID codec_
     const AVClass    *cc = avcodec_get_class();
 
     if (!codec)
-        codec            = avcodec_find_decoder(codec_id);
+        codec            = const_cast<AVCodec*>(avcodec_find_decoder(codec_id));
 
     switch (st->codecpar->codec_type) {
     case AVMEDIA_TYPE_VIDEO:
@@ -1510,7 +1548,7 @@ static AVDictionary **setup_find_stream_info_opts(AVFormatContext *s,
 
     if (!s->nb_streams)
         return NULL;
-    opts = (AVDictionary**)av_mallocz_array(s->nb_streams, sizeof(*opts));
+    opts = (AVDictionary**)av_malloc_array(s->nb_streams, sizeof(*opts));
     if (!opts) {
         av_log(NULL, AV_LOG_ERROR,
                "Could not alloc memory for stream options.\n");
@@ -1584,6 +1622,7 @@ static void dump_stream_format(char *dst, size_t size, AVFormatContext *ic, int 
 	char buf[256];
 	int flags = ic->iformat->flags;
 	AVStream *st = ic->streams[i];
+  //FFStream *fst = (FFStream*) st;
 	AVDictionaryEntry *lang = av_dict_get(st->metadata, "language", NULL, 0);
 	char *separator = (char*)ic->dump_separator;
 	AVCodecContext *avctx;
@@ -1600,12 +1639,12 @@ static void dump_stream_format(char *dst, size_t size, AVFormatContext *ic, int 
 	}
 
 	// Fields which are missing from AVCodecParameters need to be taken from the AVCodecContext
-	avctx->properties = st->codec->properties;
-	avctx->codec = st->codec->codec;
-	avctx->qmin = st->codec->qmin;
-	avctx->qmax = st->codec->qmax;
-	avctx->coded_width = st->codec->coded_width;
-	avctx->coded_height = st->codec->coded_height;
+	// avctx->properties = st->codec->properties;
+	// avctx->codec = st->codec->codec;
+	// avctx->qmin = st->codec->qmin;
+	// avctx->qmax = st->codec->qmax;
+	// avctx->coded_width = st->codec->coded_width;
+	// avctx->coded_height = st->codec->coded_height;
 
 	if (separator)
 		av_opt_set(avctx, "dump_separator", separator, 0);
@@ -1620,8 +1659,8 @@ static void dump_stream_format(char *dst, size_t size, AVFormatContext *ic, int 
 		av_strlcatf(dst, size, "[0x%x]", st->id);
 	if (lang)
 		av_strlcatf(dst, size, "(%s)", lang->value);
-	av_strlcatf(dst, size, ", %d, %d/%d", st->codec_info_nb_frames,
-		st->time_base.num, st->time_base.den);
+	//av_strlcatf(dst, size, ", %d, %d/%d", st->codec_info_nb_frames,
+	//	st->time_base.num, st->time_base.den);
 	av_strlcatf(dst, size, ": %s", buf);
 
 	if (st->sample_aspect_ratio.num &&
@@ -1640,7 +1679,7 @@ static void dump_stream_format(char *dst, size_t size, AVFormatContext *ic, int 
 		int fps = st->avg_frame_rate.den && st->avg_frame_rate.num;
 		int tbr = st->r_frame_rate.den && st->r_frame_rate.num;
 		int tbn = st->time_base.den && st->time_base.num;
-		int tbc = st->codec->time_base.den && st->codec->time_base.num;
+		int tbc = st->time_base.den && st->time_base.num;
 
 		if (fps || tbr || tbn || tbc)
 			av_strlcatf(dst, size, "%s", separator);
@@ -1652,7 +1691,7 @@ static void dump_stream_format(char *dst, size_t size, AVFormatContext *ic, int 
 		if (tbn)
 			print_fps(dst, size, 1 / av_q2d(st->time_base), tbc ? "tbn, " : "tbn");
 		if (tbc)
-			print_fps(dst, size, 1 / av_q2d(st->codec->time_base), "tbc");
+			print_fps(dst, size, 1 / av_q2d(st->time_base), "tbc");
 	}
 
 	if (st->disposition & AV_DISPOSITION_DEFAULT)
@@ -1796,6 +1835,8 @@ void PlayBackContext::streamOpen() {
     throw runtime_error("Could not allocate context.");
   }
 
+  av_log(NULL, AV_LOG_INFO, "yong avformat_alloc_context start :.\n");
+
 
   audio_volume = av_clip(audio_volume, 0, 100);
   audio_volume = av_clip(SDL_MIX_MAXVOLUME * audio_volume / 100, 0, SDL_MIX_MAXVOLUME);
@@ -1835,6 +1876,7 @@ void PlayBackContext::streamOpen() {
 
   if (genpts)
     ic->flags |= AVFMT_FLAG_GENPTS;
+
 
   av_format_inject_global_side_data(ic);
 
@@ -1892,6 +1934,7 @@ void PlayBackContext::streamOpen() {
   double tbn = 0;
   double tbc = 0;
 
+ 
   report_source_format(meta_info, sizeof(meta_info), ic, this->filename.c_str());
 
   for (int i = 0; i < ic->nb_streams; i++) {
@@ -1955,24 +1998,24 @@ void PlayBackContext::streamOpen() {
       tbn = av_q2d(st->time_base);
     }
 
-    if (st->codec->time_base.den && st->codec->time_base.num) {
-      tbc = av_q2d(st->codec->time_base);
+    if (st->time_base.den && st->time_base.num) {
+      tbc = av_q2d(st->time_base);
     }
   }
-
+av_log(NULL, AV_LOG_ERROR, "yong streamComponentOpen 1 :.\n");
   /* open the streams */
   if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
     streamComponentOpen(st_index[AVMEDIA_TYPE_AUDIO]);
   }
-
+av_log(NULL, AV_LOG_ERROR, "yong streamComponentOpen 2 :.\n");
   if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
     streamComponentOpen(st_index[AVMEDIA_TYPE_VIDEO]);
   }
-
+av_log(NULL, AV_LOG_ERROR, "yong streamComponentOpen 3 :.\n");
   if (st_index[AVMEDIA_TYPE_SUBTITLE] >= 0) {
     streamComponentOpen(st_index[AVMEDIA_TYPE_SUBTITLE]);
   }
-
+av_log(NULL, AV_LOG_ERROR, "yong streamComponentOpen 4 :.\n");
   if (st_index[AVMEDIA_TYPE_DATA] >= 0) {
     streamComponentOpen(st_index[AVMEDIA_TYPE_DATA]);
   }
@@ -2321,6 +2364,7 @@ void PlayBackContext::streamComponentOpen(int stream_index) {
   string forced_codec_name;
   int sample_rate, nb_channels;
   int64_t channel_layout;
+  AVCodec*  codec;
 
   int stream_lowres = this->lowres;
 
@@ -2344,7 +2388,7 @@ void PlayBackContext::streamComponentOpen(int stream_index) {
     // Data stream without really codec
   } else {
 
-    auto codec = avcodec_find_decoder(avctx->codec_id);
+    codec =const_cast<AVCodec*>( avcodec_find_decoder(avctx->codec_id));
 
     switch(avctx->codec_type){
           case AVMEDIA_TYPE_AUDIO   : last_audio_stream    = stream_index; forced_codec_name =    audio_codec_name; break;
@@ -2353,7 +2397,7 @@ void PlayBackContext::streamComponentOpen(int stream_index) {
     }
 
     if (forced_codec_name.size())
-          codec = avcodec_find_decoder_by_name(forced_codec_name.c_str());
+          codec = const_cast<AVCodec*>(avcodec_find_decoder_by_name(forced_codec_name.c_str()));
     if (!codec) {
       if (forced_codec_name.size()) throw runtime_error(string("No codec could be found with name ") + forced_codec_name);
       else  throw runtime_error(string("No decoder could be found for codec ") + avcodec_get_name(avctx->codec_id));
@@ -2375,8 +2419,8 @@ void PlayBackContext::streamComponentOpen(int stream_index) {
           av_dict_set(&opts, "threads", "auto", 0);
     if (stream_lowres)
           av_dict_set_int(&opts, "lowres", stream_lowres, 0);
-    if (avctx->codec_type == AVMEDIA_TYPE_VIDEO || avctx->codec_type == AVMEDIA_TYPE_AUDIO)
-          av_dict_set(&opts, "refcounted_frames", "1", 0);
+    //if (avctx->codec_type == AVMEDIA_TYPE_VIDEO || avctx->codec_type == AVMEDIA_TYPE_AUDIO)
+      //    av_dict_set(&opts, "refcounted_frames", "1", 0);
     if ((ret = avcodec_open2(avctx, codec, &opts)) < 0) {
       throw runtime_error("avcodec_open2 fail");
     }
@@ -2413,11 +2457,13 @@ void PlayBackContext::streamComponentOpen(int stream_index) {
         /* prepare audio output */
         try {
           audioOpen(channel_layout, nb_channels, sample_rate);
-        } catch (exception&) {
+        } catch (exception& e) {
           // open filed
           // skip but not raise error
+          av_log(NULL, AV_LOG_ERROR, "yong audio %s .\n",e.what());
           break;
         }
+
         this->audio_hw_buf_size = ret;
         this->audio_src = this->audio_tgt;
         this->audio_buf_size  = 0;
@@ -2849,6 +2895,8 @@ void PlayBackContext::audioOpen(int64_t wanted_channel_layout, int wanted_nb_cha
 /* prepare a new audio buffer */
 void PlayBackContext::sdl_audio_callback(void *opaque, Uint8 *stream, int len)
 {
+
+  //av_log(NULL, AV_LOG_ERROR, "yong audio sdl_audio_callback .\n",len);
     PlayBackContext *is = (PlayBackContext*)opaque;
     int audio_size, len1;
 
@@ -2869,8 +2917,10 @@ void PlayBackContext::sdl_audio_callback(void *opaque, Uint8 *stream, int len)
         len1 = is->audio_buf_size - is->audio_buf_index;
         if (len1 > len)
             len1 = len;
-        if (!is->muted_ && is->audio_buf && is->audio_volume == SDL_MIX_MAXVOLUME)
+
+        if (!is->muted_ && is->audio_buf && is->audio_volume == SDL_MIX_MAXVOLUME){
             memcpy(stream, (uint8_t *)is->audio_buf + is->audio_buf_index, len1);
+        }        
         else {
             memset(stream, 0, len1);
             if (!is->muted_ && is->audio_buf)
@@ -3313,6 +3363,7 @@ int PlayBackContext::getVideoFrame(AVFrame *frame, int& pkt_serial) {
 }
 
 void PlayBackContext::startAudioDecodeThread() {
+
   audioDecoder_.start([this](Decoder* decoder, int *pfinished) {
     AVFrame *frame = av_frame_alloc();
     Frame *af;
@@ -3408,16 +3459,19 @@ the_end:
 }
 
 void PlayBackContext::startSubtitleDecodeThread() {
+  av_log(NULL, AV_LOG_ERROR, "yong startSubtitleDecodeThread start");
   subtitleDecoder_.start([this](Decoder* decoder, int *pfinished) {
     Frame *sp;
     int got_subtitle;
     double pts;
     int pkt_serial = -1;
+    static int id =0;
 
     for (;;) {
+      av_log(NULL, AV_LOG_ERROR, "yong startSubtitleDecodeThread time %d.\n", id++);
       if (!(sp = subtitleQueue_.peek_writable()))
         return;
-
+      
       if ((got_subtitle = decoder->decodeFrame(
         [this](AVMediaType, AVCodecID codec_id, AVPacket *pkt, int *serial) {
           if (subtitlePacketQueue_.empty())
@@ -3428,7 +3482,7 @@ void PlayBackContext::startSubtitleDecodeThread() {
         break;
 
       pts = 0;
-
+      av_log(NULL, AV_LOG_ERROR, "yong startSubtitleDecodeThread sp sub got_sub %d  format %d num_r %d \n", got_subtitle,sp->sub.format,sp->sub.num_rects);
       if (got_subtitle && sp->sub.format == 0) {
             if (sp->sub.pts != AV_NOPTS_VALUE)
                 pts = sp->sub.pts / (double)AV_TIME_BASE;
@@ -3439,6 +3493,7 @@ void PlayBackContext::startSubtitleDecodeThread() {
             sp->uploaded = 0;
 
             /* now we can update the picture count */
+            av_log(NULL, AV_LOG_ERROR, "yong startSubtitleDecodeThread push subtitle .\n");
             subtitleQueue_.push();
       } else if (got_subtitle) {
             avsubtitle_free(&sp->sub);
@@ -3466,7 +3521,6 @@ void PlayBackContext::adjustExternalClockSpeed() {
 
 void PlayBackContext::video_refresh(double *remaining_time) {
   double time;
-
 retry:
   if (rewindMode()) {
     video_refresh_rewind(remaining_time);
@@ -3561,10 +3615,40 @@ double PlayBackContext::frameIdToPts(int64_t id) const {
   return id * (frame_duration_ == 0 ? 60.0 : frame_duration_);
 }
 
+/*static int realloc_texture(SDL_Texture **texture, Uint32 new_format, int new_width, int new_height, SDL_BlendMode blendmode, int init_texture)
+{
+  return 
+    Uint32 format;
+    int access, w, h;
+    if (!*texture || SDL_QueryTexture(*texture, &format, &access, &w, &h) < 0 || new_width != w || new_height != h || new_format != format) {
+        void *pixels;
+        int pitch;
+        if (*texture)
+            SDL_DestroyTexture(*texture);
+        if (!(*texture = SDL_CreateTexture(renderer, new_format, SDL_TEXTUREACCESS_STREAMING, new_width, new_height)))
+            return -1;
+        if (SDL_SetTextureBlendMode(*texture, blendmode) < 0)
+            return -1;
+        if (init_texture) {
+            if (SDL_LockTexture(*texture, NULL, &pixels, &pitch) < 0)
+                return -1;
+            memset(pixels, 0, pitch * new_height);
+            SDL_UnlockTexture(*texture);
+        }
+        av_log(NULL, AV_LOG_VERBOSE, "Created %dx%d texture with %s.\n", new_width, new_height, SDL_GetPixelFormatName(new_format));
+    }
+    return 0;
+}*/
+
+
 void PlayBackContext::video_image_display()
 {
+  static long id = 0;
+  //av_log(NULL, AV_LOG_ERROR, "yong video_image_display start %d:.\n", id++);
+
   Frame *sp = nullptr;
-	Frame *vp = pictureQueue_.peek_last();
+  Frame *vp = pictureQueue_.peek_last(); 
+
 	if (!vp->uploaded) {
     if (onIYUVDisplay) {
       auto frame = vp->frame;
@@ -3576,22 +3660,27 @@ void PlayBackContext::video_image_display()
         // av_frame_unref(frame);
         frame = yuv_ctx_.frame_;
       }
-      onIYUVDisplay(frame, vp->pts, ptsToFrameId(vp->pts));
+     // av_log(NULL, AV_LOG_ERROR, "yong onIYUVDisplay start %d:.\n", id++);
+     onIYUVDisplay(frame, vp->pts, ptsToFrameId(vp->pts));
     }
 		vp->uploaded = 1;
 	}
 
   if (this->subtitle_st) {
     if (subtitleQueue_.nb_remaining() > 0) {
-      sp = subtitleQueue_.peek();
-
-      if (vp->pts >= sp->pts + ((float) sp->sub.start_display_time / 1000)) {
+      sp = subtitleQueue_.peek_last();
+      //subtitleQueue_.next();
+      av_log(NULL, AV_LOG_ERROR, "yong subtitle peek %f, %f,%f:.\n", vp->pts, sp->pts, sp->sub.start_display_time);
+      if (vp->pts >= sp->pts + ((float) sp->sub.start_display_time / 1000)||sp) {
+        av_log(NULL, AV_LOG_ERROR, "yong subtitle time %d:uploaded %d.\n", id++,sp->uploaded);
         if (!sp->uploaded) {
           if (!sp->width || !sp->height) {
             sp->width = vp->width;
             sp->height = vp->height;
           }
-
+          /*if (realloc_texture(&is->sub_texture, SDL_PIXELFORMAT_ARGB8888, sp->width, sp->height, SDL_BLENDMODE_BLEND, 1) < 0)
+                        return;*/
+          av_log(NULL, AV_LOG_ERROR, "yong subtitle sp sub %d: %x.\n", sp->sub.num_rects,sp->frame);
           for (int i = 0; i < sp->sub.num_rects; i++) {
             AVSubtitleRect *sub_rect = sp->sub.rects[i];
 
@@ -3601,15 +3690,20 @@ void PlayBackContext::video_image_display()
             sub_rect->h = av_clip(sub_rect->h, 0, sp->height - sub_rect->y);
 
             if (sub_yuv_ctx_.convert(AV_PIX_FMT_PAL8, sub_rect->w, sub_rect->h, (const uint8_t * const *)sub_rect->data, sub_rect->linesize) >= 0) {
-
+                av_log(NULL, AV_LOG_ERROR, "yong subtitle display %d:.\n", id);
+              auto frame = sub_yuv_ctx_.frame_;
+              onIYUVDisplay(frame, sp->pts, ptsToFrameId(sp->pts));  
             }
           }
           sp->uploaded = 1;
         }
-      } else
+      } else{
         sp = nullptr;
+      }
+        subtitleQueue_.next();
     }
   }
+
 }
 
 double PlayBackContext::vp_duration(const Frame *vp, const Frame *nextvp) const {
@@ -3838,15 +3932,15 @@ void PlayBackContext::change_speed(double speed) {
   if (speed < 0) {
     if (seekMethod_ == SEEK_METHOD_NONE) {
       auto vp = pictureQueue_.peek();
-      frameRewindTarget_ = vp->frame->pkt_pts;
-      sendSeekRequest(SEEK_METHOD_REWIND, vp->frame->pkt_pts);
+      frameRewindTarget_ = vp->frame->pts;
+      sendSeekRequest(SEEK_METHOD_REWIND, vp->frame->pts);
     }
   } else {
     if (prevIsRewindMode) {
       rewind_ = false;
       //int64_t target_pos = (int64_t)(tm * AV_TIME_BASE);
       auto vp = pictureQueue_.peek();
-      int64_t target_pos = av_rescale_q(vp->frame->pkt_pts, video_time_base_, AVRational{1, AV_TIME_BASE});
+      int64_t target_pos = av_rescale_q(vp->frame->pts, video_time_base_, AVRational{1, AV_TIME_BASE});
       sendSeekRequest(SEEK_METHOD_POS, target_pos);
     }
   }
@@ -3944,7 +4038,7 @@ int PlayBackContext::onVideoFrameDecodedReversed(AVFrame *frame, int serial) {
     return 0;
   }
 
-  if (frame->pkt_pts < frameRewindTarget_) {
+  if (frame->pts < frameRewindTarget_) {
     // bufferring
     AVRational tb = video_time_base_;
     double pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
@@ -3952,7 +4046,7 @@ int PlayBackContext::onVideoFrameDecodedReversed(AVFrame *frame, int serial) {
   } else {
     av_frame_unref(frame); 
 
-    frameRewindTarget_ = rewindBuffer_.empty() ? 0 : rewindBuffer_.front().frame->pkt_pts;
+    frameRewindTarget_ = rewindBuffer_.empty() ? 0 : rewindBuffer_.front().frame->pts;
   
     // reverse put to frame queue
     while (!rewindBuffer_.empty()) {
@@ -4053,7 +4147,7 @@ retry:
     pictureQueue_.next();
     force_refresh_ = true;
 
-    if (rewindEofPts_ >= vp->frame->pkt_pts && !this->paused) {
+    if (rewindEofPts_ >= vp->frame->pts && !this->paused) {
       stream_toggle_pause();
       change_speed(1.0);
       if (onStatus) {
@@ -4073,3 +4167,5 @@ bool PlayBackContext::videoPacketIsAddonData(AVCodecID codec_id, const AVPacket 
 int PlayBackContext::dealWithDataPacket(const AVPacket *pkt, const int pkt_serial) {
   return 0;
 }
+
+

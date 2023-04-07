@@ -14,7 +14,7 @@ const nodeMajor2Abis = {
 }
 
 const ABI = nodeMajor2Abis[process.versions.node.split('.')[0]]
-const EXT = process.platform === 'win32' ? '.dll' : '.so'
+const EXT = '.dylib' // process.platform === 'win32' ? '.dll' : '.so'
 const archName = process.platform + '-' + process.arch
 
 /* eslint-disable no-undef */
@@ -35,5 +35,6 @@ export function resolveAddonPath (name) {
 }
 
 export function requireAddon (modname) {
+  console.log(resolveAddonPath(modname))
   return __non_webpack_require__(resolveAddonPath(modname))
 }
